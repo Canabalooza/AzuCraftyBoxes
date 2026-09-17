@@ -172,7 +172,9 @@ static class PlayerHaveRequirementsPatchRBoolInt
 
         foreach (Piece.Requirement resource in piece.m_resources)
         {
-            if (resource.m_resItem && MiscFunctions.MatchesStationUpgrader(resource, currentStation))
+            // No upgrader filter when discovering (upgrade station unlocked every recipe) fucked over a few people...but, good now.
+            bool stationOk = discover ? currentStation != null || !resource.m_upgraderResource : MiscFunctions.MatchesStationUpgrader(resource, currentStation);
+            if (resource.m_resItem && stationOk)
             {
                 if (discover)
                 {
@@ -427,30 +429,20 @@ static class CheckNearbyForOneIngredientItems
             int requiredAmount = resource.GetAmount(qualityLevel) * craftMultiplier;
 
 
-            int availableAmount = 0;
-            IContainer sourceContainer = null;
+            IContainer? sourceContainer = null;
+            ItemDrop.ItemData? containerItem = null;
 
-            foreach (IContainer? container in nearbyContainers)
+            foreach (IContainer container in nearbyContainers)
             {
-                int containerAmount = container.ItemCount(reqName);
-                if (containerAmount <= 0)
-                    continue;
-
-                availableAmount += containerAmount;
-
-                if (availableAmount < requiredAmount) continue;
+                if (!Boxes.CanItemBePulled(container.GetPrefabName(), resource.m_resItem.name)) continue;
+                if (Boxes.CheckAndDecrement(container.ItemCount(reqName)) < requiredAmount) continue;
+                containerItem = container.GetInventory()?.GetItem(reqName);
+                if (containerItem == null) continue;
                 sourceContainer = container;
                 break;
             }
 
-            if (availableAmount < requiredAmount || sourceContainer == null) continue;
-            if (sourceContainer.GetInventory() == null)
-            {
-                return;
-            }
-
-            ItemDrop.ItemData containerItem = sourceContainer.GetInventory().GetItem(reqName);
-            if (containerItem == null) continue;
+            if (sourceContainer == null || containerItem == null) continue;
             __result = containerItem;
             amount = requiredAmount;
             extraAmount = resource.m_extraAmountOnlyOneIngredient;
@@ -470,36 +462,53 @@ static class CheckNearbyForOneIngredientItems
 [HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.DoCrafting))]
 static class ConsumeLaterConsumptionItemsInventoryGuiDoCraftingPatch
 {
-    static void Postfix(InventoryGui __instance)
+    internal static bool Crafting;
+
+    static void Prefix()
     {
-        if (MiscFunctions.ShouldPrevent())
+        ClearPending();
+        Crafting = true;
+    }
+
+    static void Finalizer()
+    {
+        Crafting = false;
+        ClearPending();
+    }
+
+    private static void ClearPending()
+    {
+        while (ConsumptionManager.PendingConsumptions.TryTake(out _))
         {
-            return;
         }
+    }
+}
 
-        foreach (Boxes.LaterConsumption? consumption in ConsumptionManager.PendingConsumptions.ToList())
+// Vanilla only calls this once the craft actually happened
+[HarmonyPatch(typeof(Inventory), nameof(Inventory.RemoveItem), typeof(string), typeof(int), typeof(int), typeof(bool))]
+static class ConsumeLaterConsumptionItemsRemoveItemPatch
+{
+    static bool Prefix(Inventory __instance, string name, int itemQuality)
+    {
+        if (!ConsumeLaterConsumptionItemsInventoryGuiDoCraftingPatch.Crafting || MiscFunctions.ShouldPrevent()) return true;
+        if (Player.m_localPlayer == null || __instance != Player.m_localPlayer.GetInventory()) return true;
+
+        foreach (Boxes.LaterConsumption consumption in ConsumptionManager.PendingConsumptions)
         {
-            if (consumption.SourceContainer == null)
-            {
-                continue;
-            }
-
-            Inventory? containerInventory = consumption.SourceContainer.GetInventory();
-            if (containerInventory == null)
-            {
-                continue;
-            }
+            if (consumption.Name != name || consumption.Quality != itemQuality) continue;
+            Inventory? containerInventory = consumption.SourceContainer?.GetInventory();
+            if (containerInventory == null) continue;
 
             containerInventory.RemoveItem(consumption.Name, consumption.Amount, consumption.Quality);
+            consumption.SourceContainer!.Save();
+            while (ConsumptionManager.PendingConsumptions.TryTake(out _))
+            {
+            }
 
-
-            ConsumptionManager.PendingConsumptions.TryTake(out _);
+            return false;
         }
 
-        while (!ConsumptionManager.PendingConsumptions.IsEmpty)
-        {
-            ConsumptionManager.PendingConsumptions.TryTake(out _);
-        }
+        return true;
     }
 }
 

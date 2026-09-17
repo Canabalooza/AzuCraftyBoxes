@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using AzuCraftyBoxes.Compatibility;
 using AzuCraftyBoxes.IContainers;
 using Backpacks;
 using ItemDataManager;
@@ -77,6 +78,7 @@ public class Boxes
     private static readonly List<IContainer> _scratchkgDrawers = new(128);
     private static readonly List<IContainer> _scratchmkzDrawers = new(128);
     private static readonly List<IContainer> _scratchBackpacks = new(32);
+    private static readonly List<IContainer> _scratchQuivers = new(8);
     private static readonly List<IContainer> _scratchGemBags = new(32);
 
     private static Vector3 _lastQueryPos = Vector3.positiveInfinity;
@@ -107,6 +109,7 @@ public class Boxes
         _scratchkgDrawers.Clear();
         _scratchmkzDrawers.Clear();
         _scratchBackpacks.Clear();
+        _scratchQuivers.Clear();
         _scratchGemBags.Clear();
         _cachedAll.Clear();
 
@@ -156,6 +159,15 @@ public class Boxes
 
             HashSetPool<ItemContainer>.Release(seen);
         }
+
+        if (BowsBeforeHoesCompat.IsLoaded)
+        {
+            foreach (ItemDrop.ItemData item in Player.m_localPlayer.GetInventory().GetAllItems())
+            {
+                if (BowsBeforeHoesCompat.GetInventory(item) is { } inventory)
+                    _scratchQuivers.Add(new BowsBeforeHoesQuiver(item, inventory));
+            }
+        }
         
         if (Jewelcrafting.API.IsLoaded())
         {
@@ -178,6 +190,7 @@ public class Boxes
         _cachedAll.AddRange(_scratchNearby); // Makail ItemDrawers should still be captured by this.
         _cachedAll.AddRange(_scratchkgDrawers);
         _cachedAll.AddRange(_scratchBackpacks);
+        _cachedAll.AddRange(_scratchQuivers);
         _cachedAll.AddRange(_scratchGemBags);
 
         _lastQueryPos = pos;

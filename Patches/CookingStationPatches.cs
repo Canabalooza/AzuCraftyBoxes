@@ -53,7 +53,7 @@ static class CookingStationOnAddFuelSwitchPatch
             c.RemoveItem(sharedName, 1);
             c.Save();
             user.Message(MessageHud.MessageType.Center, "$msg_added " + sharedName);
-            ___m_nview.InvokeRPC("RPC_AddFuel", Array.Empty<object>(), false);
+            ___m_nview.InvokeRPC("RPC_AddFuel");
             __result = true;
             return false;
         }
@@ -104,12 +104,28 @@ static class CookingStationFindCookableItemPatch
                 ItemDrop.ItemData itemData = drop.GetComponent<ItemDrop>().m_itemData.Clone();
                 itemData.m_dropPrefab = drop;
                 __result = itemData;
-
-                c.RemoveItem(sharedName, 1);
-
-                c.Save();
+                Item = itemData;
+                Source = c;
                 return;
             }
         }
+    }
+
+    internal static ItemDrop.ItemData? Item;
+    internal static IContainer? Source;
+}
+
+[HarmonyPatch(typeof(CookingStation), nameof(CookingStation.CookItem))]
+static class CookingStationCookItemPatch
+{
+    static void Prefix(CookingStation __instance, ItemDrop.ItemData item)
+    {
+        if (item != CookingStationFindCookableItemPatch.Item || CookingStationFindCookableItemPatch.Source == null) return;
+        if (!__instance.IsItemAllowed(item) || __instance.GetFreeSlot() == -1) return;
+
+        CookingStationFindCookableItemPatch.Source.RemoveItem(item.m_shared.m_name, 1);
+        CookingStationFindCookableItemPatch.Source.Save();
+        CookingStationFindCookableItemPatch.Item = null;
+        CookingStationFindCookableItemPatch.Source = null;
     }
 }

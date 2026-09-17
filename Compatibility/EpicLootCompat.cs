@@ -40,20 +40,35 @@ public static class EpicLootCompat
     private static int CountItem(string itemName)
     {
         int count = 0;
+        string prefabName = PrefabNameOf(itemName);
         foreach (IContainer container in Nearby())
         {
+            if (!Boxes.CanItemBePulled(container.GetPrefabName(), prefabName, TablePrefabName)) continue;
             count += Boxes.CheckAndDecrement(container.ItemCount(itemName));
         }
 
         return count;
     }
 
+    private static string PrefabNameOf(string sharedName)
+    {
+        foreach (GameObject prefab in ObjectDB.instance.m_items)
+        {
+            if (prefab.TryGetComponent(out ItemDrop itemDrop) && itemDrop.m_itemData.m_shared.m_name == sharedName)
+                return prefab.name;
+        }
+
+        return sharedName;
+    }
+
     private static int RemoveItem(string itemName, int amount)
     {
         int removed = 0;
+        string prefabName = PrefabNameOf(itemName);
         foreach (IContainer container in Nearby())
         {
             if (removed >= amount) break;
+            if (!Boxes.CanItemBePulled(container.GetPrefabName(), prefabName, TablePrefabName)) continue;
 
             int available = Boxes.CheckAndDecrement(container.ItemCount(itemName));
             if (available <= 0) continue;
@@ -76,10 +91,15 @@ public static class EpicLootCompat
         foreach (IContainer container in Nearby())
         {
             Inventory? inventory = container.GetInventory();
-            if (inventory == null || !inventory.GetAllItems().Contains(item)) continue;
+            if (inventory == null) continue;
+            if (item.m_dropPrefab != null && !Boxes.CanItemBePulled(container.GetPrefabName(), item.m_dropPrefab.name, TablePrefabName)) continue;
 
-            int take = Math.Min(item.m_stack, amount);
-            if (!inventory.RemoveItem(item, take)) continue;
+            List<ItemDrop.ItemData> items = inventory.GetAllItems();
+            ItemDrop.ItemData? match = items.Contains(item) ? item : items.Find(i => i.m_shared.m_name == item.m_shared.m_name && i.m_quality == item.m_quality && i.m_variant == item.m_variant && i.m_worldLevel == item.m_worldLevel && i.m_customData.Count == item.m_customData.Count && !i.m_customData.Except(item.m_customData).Any());
+            if (match == null) continue;
+
+            int take = Math.Min(match.m_stack, amount);
+            if (!inventory.RemoveItem(match, take)) continue;
 
             container.Save();
             return take;
