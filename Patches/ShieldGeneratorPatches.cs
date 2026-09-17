@@ -27,7 +27,7 @@ namespace AzuCraftyBoxes.Patches
                 return true;
             }
 
-            if (AzuCraftyBoxesPlugin.fillAllModKey.Value.MainKey == KeyCode.None)
+            if (!MiscFunctions.IsFillAllBound())
             {
                 return true;
             }
@@ -80,7 +80,7 @@ namespace AzuCraftyBoxes.Patches
 
             if (items.Count > 0)
             {
-                result += Localization.instance.Localize($"\n[<b><color=yellow>{AzuCraftyBoxesPlugin.fillAllModKey.Value}</color> + <color=yellow>$KEY_Use</color></b>] Add {string.Join(" and ", items)}");
+                result += Localization.instance.Localize($"\n[<b><color=yellow>{MiscFunctions.FillAllHint()}</color> + <color=yellow>$KEY_Use</color></b>] Add {string.Join(" and ", items)}");
             }
         }
     }
@@ -101,7 +101,7 @@ namespace AzuCraftyBoxes.Patches
     {
         static bool Prefix(ShieldGenerator __instance, ref bool __result, ZNetView ___m_nview, Humanoid user, ItemDrop.ItemData item)
         {
-            bool pullAll = AzuCraftyBoxesPlugin.fillAllModKey.Value.IsKeyHeld();
+            bool pullAll = MiscFunctions.IsFillAllHeld();
             Inventory inventory = user.GetInventory();
             if (MiscFunctions.ShouldPrevent()
                 || item != null

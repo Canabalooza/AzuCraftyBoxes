@@ -80,7 +80,7 @@ public static class OverrideHoverTextFermenter
             return true;
         }
 
-        if (AzuCraftyBoxesPlugin.fillAllModKey.Value.MainKey is KeyCode.None)
+        if (!MiscFunctions.IsFillAllBound())
         {
             return true;
         }
@@ -126,7 +126,7 @@ public static class OverrideHoverTextFermenter
 
         if (entry.items.Count > 0)
         {
-            result += Localization.instance.Localize($"\n[<b><color=yellow>{AzuCraftyBoxesPlugin.fillAllModKey.Value}</color> + <color=yellow>$KEY_Use</color></b>] {__instance.m_addSwitch.m_onHover} {string.Join(", ", entry.items)} from Inventory & Nearby Containers");
+            result += Localization.instance.Localize($"\n[<b><color=yellow>{MiscFunctions.FillAllHint()}</color> + <color=yellow>$KEY_Use</color></b>] {__instance.m_addSwitch.m_onHover} {string.Join(", ", entry.items)} from Inventory & Nearby Containers");
         }
     }
 

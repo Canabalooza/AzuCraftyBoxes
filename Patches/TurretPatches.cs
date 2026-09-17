@@ -8,7 +8,7 @@ static class Turret_UseItem_Patch
 {
     static bool Prefix(Turret __instance, Humanoid user, ref ItemDrop.ItemData item, ref bool __result, ZNetView ___m_nview)
     {
-        bool pullAll = Input.GetKey(AzuCraftyBoxesPlugin.fillAllModKey.Value.MainKey);
+        bool pullAll = MiscFunctions.IsFillAllHeld();
         Inventory inventory = user.GetInventory();
         if (MiscFunctions.ShouldPrevent() || item != null || user is not Player)
             return true;
@@ -137,7 +137,7 @@ static class TurretGetHoverTextPatch
             return;
         }
 
-        if (AzuCraftyBoxesPlugin.fillAllModKey.Value.MainKey is KeyCode.None)
+        if (!MiscFunctions.IsFillAllBound())
         {
             return;
         }
@@ -191,7 +191,7 @@ static class TurretGetHoverTextPatch
 
         if (items.Count > 0)
         {
-            __result += Localization.instance.Localize($"\n[<b><color=yellow>{AzuCraftyBoxesPlugin.fillAllModKey.Value}</color> + <color=yellow>$KEY_Use</color></b>] {string.Join(" and ", items)}");
+            __result += Localization.instance.Localize($"\n[<b><color=yellow>{MiscFunctions.FillAllHint()}</color> + <color=yellow>$KEY_Use</color></b>] {string.Join(" and ", items)}");
         }
     }
 }

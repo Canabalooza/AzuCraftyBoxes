@@ -28,6 +28,31 @@ public class MiscFunctions
         return AzuCraftyBoxesPlugin.ModEnabled.Value.isOff() || !AllowPullingLogic();
     }
 
+    /* Fill All Modifier */
+    internal static bool IsFillAllHeld()
+    {
+        return AzuCraftyBoxesPlugin.fillAllModKey.Value.IsKeyHeld() || AzuCraftyBoxesPlugin.fillAllModGamepadKey.Value.IsButtonHeld();
+    }
+
+    internal static bool IsFillAllBound()
+    {
+        return AzuCraftyBoxesPlugin.fillAllModKey.Value.MainKey != KeyCode.None || AzuCraftyBoxesPlugin.fillAllModGamepadKey.Value.IsBound();
+    }
+
+    internal static string FillAllHint()
+    {
+        string keyboardHint = AzuCraftyBoxesPlugin.fillAllModKey.Value.MainKey != KeyCode.None ? AzuCraftyBoxesPlugin.fillAllModKey.Value.ToString() : string.Empty;
+        string gamepadHint = AzuCraftyBoxesPlugin.fillAllModGamepadKey.Value.IsBound() ? AzuCraftyBoxesPlugin.fillAllModGamepadKey.Value.DisplayName() : string.Empty;
+
+        // Show the binding for the input source in use, falling back to the other one so the hint is never blank
+        if (ZInput.IsGamepadActive())
+        {
+            return gamepadHint.Length > 0 ? gamepadHint : keyboardHint;
+        }
+
+        return keyboardHint.Length > 0 ? keyboardHint : gamepadHint;
+    }
+
     internal static bool ShouldSkipContainer(Container container)
     {
         return ShouldPrevent() || container.GetInventory() == null || !container.m_nview.IsValid() || container.m_nview.GetZDO().GetLong(ZDOVars.s_creator) == 0L;

@@ -91,6 +91,10 @@ FillAllModKey [Not Synced with Server]
 * Modifier key to pull all available fuel or ore when down. Use https://docs.unity3d.com/Manual/ConventionalGameInput.html
     * Default Value: LeftShift
 
+FillAllModGamepadKey [Not Synced with Server]
+* Controller modifier to pull all available fuel or ore when held. AlternateFunction uses whatever button you have bound to the game's alternate function (Left Trigger by default). Set to None to disable.
+    * Default Value: AlternateFunction
+
 Prevent Pulling Logic [Not Synced with Server]
 * Key to prevent pulling from nearby containers. This prevents all pulling logic from running, essentially making the mod appear as if it's not installed. This is different from the Mod Enabled option because it allows toggling on the fly (specifically for you as the player)  Use https://docs.unity3d.com/Manual/ConventionalGameInput.html
     * Default Value: O + LeftAlt

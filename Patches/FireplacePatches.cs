@@ -12,7 +12,7 @@ static class FireplaceInteractPatch
         if (___m_nview == null || !___m_nview.IsValid() || __instance.m_infiniteFuel || __instance.m_fuelItem?.m_itemData?.m_shared == null)
             return true;
 
-        bool pullAll = Input.GetKey(AzuCraftyBoxesPlugin.fillAllModKey.Value.MainKey); // Used to be fillAllModKey.Value.IsPressed(); something is wrong with KeyboardShortcuts always returning false
+        bool pullAll = MiscFunctions.IsFillAllHeld();
         Inventory inventory = user.GetInventory();
 
         if (MiscFunctions.ShouldPrevent() || hold || inventory == null || (inventory.HaveItem(__instance.m_fuelItem.m_itemData.m_shared.m_name) && !pullAll))
@@ -108,7 +108,7 @@ static class FireplaceGetHoverTextPatch
             return;
         }
 
-        if (AzuCraftyBoxesPlugin.fillAllModKey.Value.MainKey is KeyCode.None)
+        if (!MiscFunctions.IsFillAllBound())
         {
             return;
         }
@@ -171,7 +171,7 @@ static class FireplaceGetHoverTextPatch
 
         if (items.Count > 0)
         {
-            __result += Localization.instance.Localize($"\n[<b><color=yellow>{AzuCraftyBoxesPlugin.fillAllModKey.Value}</color> + <color=yellow>$KEY_Use</color></b>] {string.Join(" and ", items)}");
+            __result += Localization.instance.Localize($"\n[<b><color=yellow>{MiscFunctions.FillAllHint()}</color> + <color=yellow>$KEY_Use</color></b>] {string.Join(" and ", items)}");
         }
     }
 }

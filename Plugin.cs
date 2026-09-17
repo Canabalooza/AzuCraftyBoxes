@@ -57,6 +57,22 @@ namespace AzuCraftyBoxes
             Off = 0,
         }
 
+        public enum GamepadButton
+        {
+            None,
+            AlternateFunction,
+            LeftTrigger,
+            RightTrigger,
+            LeftBumper,
+            RightBumper,
+            DPadLeft,
+            DPadRight,
+            DPadUp,
+            DPadDown,
+            LeftStick,
+            RightStick,
+        }
+
         public void Awake()
         {
             bool saveOnSet = Config.SaveOnConfigSet;
@@ -85,6 +101,7 @@ namespace AzuCraftyBoxes
             //pulledMessage = TextEntryConfig("2 - CraftyBoxes", "PulledMessage", "Pulled items to inventory", "Message to show after pulling items to player inventory", false);
             //pullItemsKey = config("3 - Keys", "PullItemsKey", new KeyboardShortcut(KeyCode.LeftControl), new ConfigDescription("Holding down this key while crafting or building will pull resources into your inventory instead of building. Use https://docs.unity3d.com/Manual/ConventionalGameInput.html", new AcceptableShortcuts()), false);
             fillAllModKey = config("3 - Keys", "FillAllModKey", new KeyboardShortcut(KeyCode.LeftShift), new ConfigDescription("Modifier key to pull all available fuel or ore when down. Use https://docs.unity3d.com/Manual/ConventionalGameInput.html", new AcceptableShortcuts()), false);
+            fillAllModGamepadKey = config("3 - Keys", "FillAllModGamepadKey", GamepadButton.AlternateFunction, "Controller modifier to pull all available fuel or ore when held. AlternateFunction uses whatever button you have bound to the game's alternate function (Left Trigger by default). Set to None to disable.", false);
             preventPullingLogic = config("3 - Keys", "Prevent Pulling Logic", new KeyboardShortcut(KeyCode.O, KeyCode.LeftAlt), new ConfigDescription("Key to prevent pulling from nearby containers. This prevents all pulling logic from running, essentially making the mod appear as if it's not installed. This is different from the Mod Enabled option because it allows toggling on the fly (specifically for you as the player)  Use https://docs.unity3d.com/Manual/ConventionalGameInput.html", new AcceptableShortcuts()), false);
 
             if (!File.Exists(yamlPath))
@@ -352,6 +369,7 @@ namespace AzuCraftyBoxes
         public static ConfigEntry<string> pulledMessage = null!;
         public static ConfigEntry<KeyboardShortcut> pullItemsKey = null!;
         public static ConfigEntry<KeyboardShortcut> fillAllModKey = null!;
+        public static ConfigEntry<GamepadButton> fillAllModGamepadKey = null!;
         public static ConfigEntry<KeyboardShortcut> preventPullingLogic = null!;
         public static ConfigEntry<Toggle> preventPullingLogicMessage = null!;
         public static ConfigEntry<string> preventPullingStringFormat = null!;
@@ -431,6 +449,74 @@ namespace AzuCraftyBoxes
         public static bool IsKeyHeld(this KeyboardShortcut shortcut)
         {
             return shortcut.MainKey != KeyCode.None && Input.GetKey(shortcut.MainKey) && shortcut.Modifiers.All(Input.GetKey);
+        }
+    }
+
+    public static class GamepadExtensions
+    {
+        public static bool IsBound(this AzuCraftyBoxesPlugin.GamepadButton button)
+        {
+            return button != AzuCraftyBoxesPlugin.GamepadButton.None;
+        }
+
+        public static bool IsButtonHeld(this AzuCraftyBoxesPlugin.GamepadButton button)
+        {
+            string buttonName = button.ZInputName();
+            return buttonName.Length > 0 && ZInput.instance != null && ZInput.GetButton(buttonName);
+        }
+
+        public static string DisplayName(this AzuCraftyBoxesPlugin.GamepadButton button)
+        {
+            string buttonName = button.ZInputName();
+            if (buttonName.Length > 0 && ZInput.instance != null)
+            {
+                try
+                {
+                    // Returns the glyph the game shows for the bound control
+                    string boundKey = ZInput.instance.GetBoundKeyString(buttonName, true);
+                    if (!string.IsNullOrEmpty(boundKey))
+                    {
+                        return boundKey;
+                    }
+                }
+                catch (KeyNotFoundException)
+                {
+                    // No glyph is registered for the bound control, fall back to the config value's name
+                }
+            }
+
+            return button.ToString();
+        }
+
+        private static string ZInputName(this AzuCraftyBoxesPlugin.GamepadButton button)
+        {
+            switch (button)
+            {
+                case AzuCraftyBoxesPlugin.GamepadButton.AlternateFunction:
+                    return "JoyAltKeys";
+                case AzuCraftyBoxesPlugin.GamepadButton.LeftTrigger:
+                    return "JoyLTrigger";
+                case AzuCraftyBoxesPlugin.GamepadButton.RightTrigger:
+                    return "JoyRTrigger";
+                case AzuCraftyBoxesPlugin.GamepadButton.LeftBumper:
+                    return "JoyLBumper";
+                case AzuCraftyBoxesPlugin.GamepadButton.RightBumper:
+                    return "JoyRBumper";
+                case AzuCraftyBoxesPlugin.GamepadButton.DPadLeft:
+                    return "JoyDPadLeft";
+                case AzuCraftyBoxesPlugin.GamepadButton.DPadRight:
+                    return "JoyDPadRight";
+                case AzuCraftyBoxesPlugin.GamepadButton.DPadUp:
+                    return "JoyDPadUp";
+                case AzuCraftyBoxesPlugin.GamepadButton.DPadDown:
+                    return "JoyDPadDown";
+                case AzuCraftyBoxesPlugin.GamepadButton.LeftStick:
+                    return "JoyLStick";
+                case AzuCraftyBoxesPlugin.GamepadButton.RightStick:
+                    return "JoyRStick";
+                default:
+                    return string.Empty;
+            }
         }
     }
 

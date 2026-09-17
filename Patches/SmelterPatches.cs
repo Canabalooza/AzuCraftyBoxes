@@ -42,7 +42,7 @@ public static class OverrideHoverText
             return true;
         }
 
-        if (AzuCraftyBoxesPlugin.fillAllModKey.Value.MainKey is KeyCode.None)
+        if (!MiscFunctions.IsFillAllBound())
         {
             return true;
         }
@@ -70,7 +70,7 @@ public static class OverrideHoverText
         {
             if (Boxes.CanItemBePulled(Utils.GetPrefabName(__instance.gameObject), Utils.GetPrefabName(__instance.m_fuelItem.m_itemData.m_dropPrefab)))
             {
-                result += Localization.instance.Localize($"\n[<b><color=yellow>{AzuCraftyBoxesPlugin.fillAllModKey.Value}</color> + <color=yellow>$KEY_Use</color></b>] $piece_smelter_add {__instance.m_fuelItem.m_itemData.m_shared.m_name} {amount} from Inventory & Nearby Containers");
+                result += Localization.instance.Localize($"\n[<b><color=yellow>{MiscFunctions.FillAllHint()}</color> + <color=yellow>$KEY_Use</color></b>] $piece_smelter_add {__instance.m_fuelItem.m_itemData.m_shared.m_name} {amount} from Inventory & Nearby Containers");
             }
         }
     }
@@ -111,7 +111,7 @@ public static class OverrideHoverText
 
         if (items.Count > 0)
         {
-            result += Localization.instance.Localize($"\n[<b><color=yellow>{AzuCraftyBoxesPlugin.fillAllModKey.Value}</color> + <color=yellow>$KEY_Use</color></b>] {__instance.m_addOreTooltip} {string.Join(", ", items)} from Inventory & Nearby Containers");
+            result += Localization.instance.Localize($"\n[<b><color=yellow>{MiscFunctions.FillAllHint()}</color> + <color=yellow>$KEY_Use</color></b>] {__instance.m_addOreTooltip} {string.Join(", ", items)} from Inventory & Nearby Containers");
         }
     }
 
@@ -160,7 +160,7 @@ static class SmelterOnAddOrePatch
     static bool Prefix(Smelter __instance, Humanoid user, ItemDrop.ItemData item, ZNetView ___m_nview)
     {
         int ore = __instance.GetQueueSize();
-        bool pullAll = AzuCraftyBoxesPlugin.fillAllModKey.Value.IsKeyHeld();
+        bool pullAll = MiscFunctions.IsFillAllHeld();
         if (MiscFunctions.ShouldPrevent() || item != null || ore >= __instance.m_maxOre)
             return true;
 
@@ -290,7 +290,7 @@ static class SmelterOnAddFuelPatch
 {
     static bool Prefix(Smelter __instance, ref bool __result, ZNetView ___m_nview, Humanoid user, ItemDrop.ItemData item)
     {
-        bool pullAll = AzuCraftyBoxesPlugin.fillAllModKey.Value.IsKeyHeld();
+        bool pullAll = MiscFunctions.IsFillAllHeld();
         Inventory inventory = user.GetInventory();
         if (MiscFunctions.ShouldPrevent() || item != null || inventory == null ||
             ((inventory.HaveItem(__instance.m_fuelItem.m_itemData.m_shared.m_name) && !pullAll) && Boxes.CanItemBePulled(Utils.GetPrefabName(__instance.gameObject), __instance.m_fuelItem.name)))
