@@ -69,6 +69,7 @@ public class MiscFunctions
             if (needed <= 0) continue;
 
             string name = requirement.m_resItem.m_itemData.m_shared.m_name;
+            string prefabName = requirement.m_resItem.name;
 
             // Remove from player first
             int fromPlayer = Mathf.Min(needed, pInventory.CountItems(name));
@@ -83,6 +84,7 @@ public class MiscFunctions
             for (int i = 0; i < nearbyContainers.Count && needed > 0; ++i)
             {
                 var c = nearbyContainers[i];
+                if (!Boxes.CanItemBePulled(c.GetPrefabName(), prefabName)) continue;
                 int have = c.ItemCount(name);
                 int allowed = Boxes.CheckAndDecrement(have);
                 if (allowed <= 0) continue;
