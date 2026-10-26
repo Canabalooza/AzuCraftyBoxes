@@ -3,53 +3,62 @@ using static AzuCraftyBoxes.AzuCraftyBoxesPlugin;
 
 namespace AzuCraftyBoxes.Util;
 
+public enum PullMode
+{
+    Off = 0,
+    All = 1,
+    MineOnly = 2,
+}
+
 public static class PlayerPullingExtensions
 {
-    /// <summary>
-    /// Returns true if pulling is allowed (state == 1).
-    /// </summary>
-    public static bool IsPullingAllowed(this Player player)
+    public static PullMode GetPullMode(this Player player)
     {
-        if (!player.m_customData.TryGetValue(PreventPullingLogicKey, out string? rawValue) || !int.TryParse(rawValue, out int state))
+        if (!player.m_customData.TryGetValue(PreventPullingLogicKey, out string? rawValue) || !int.TryParse(rawValue, out int state) || state < 0 || state > 2)
         {
-            // default => 1 (allowed)
-            state = 1;
+            state = (int)PullMode.All;
             player.m_customData[PreventPullingLogicKey] = state.ToString();
         }
 
-        return state == 1;
+        return (PullMode)state;
     }
 
-    /// <summary>
-    /// Writes back 1=allowed, 0=prevented.
-    /// </summary>
-    public static void SetPullingAllowed(this Player player, bool allowed)
+    public static void SetPullMode(this Player player, PullMode mode)
     {
-        player.m_customData[PreventPullingLogicKey] = (allowed ? 1 : 0).ToString();
+        player.m_customData[PreventPullingLogicKey] = ((int)mode).ToString();
     }
 
-    /// <summary>
-    /// Adds/removes the status effect when pulling is prevented.
-    /// </summary>
+    public static bool IsPullingAllowed(this Player player)
+    {
+        return player.GetPullMode() != PullMode.Off;
+    }
+
     public static void ApplyPullingStatusEffect(this Player player)
     {
-        bool allowed = player.IsPullingAllowed();
-        if (!allowed && preventPullingStatusEffectDisplay.Value.isOn())
-            player.m_seman.AddStatusEffect(SE_ContainerPull.SE_ContainerPulling);
-        else
-            player.m_seman.RemoveStatusEffect(SE_ContainerPull.SE_ContainerPulling);
+        PullMode mode = player.GetPullMode();
+        bool show = preventPullingStatusEffectDisplay.Value.isOn();
+        SetStatusEffect(player, SE_ContainerPull.SE_ContainerPulling, show && mode == PullMode.Off);
+        SetStatusEffect(player, SE_ContainerPull.SE_MineOnly, show && mode == PullMode.MineOnly);
     }
 
-    /// <summary>
-    /// Flip the allowed flag (1↔0), write it back, reapply effect,
-    /// and return the new allowed state.
-    /// </summary>
-    public static bool TogglePullingAllowed(this Player player)
+    public static PullMode CyclePullMode(this Player player)
     {
-        bool current = player.IsPullingAllowed();
-        bool next = !current;
-        player.SetPullingAllowed(next);
+        PullMode next = player.GetPullMode() switch
+        {
+            PullMode.All => PullMode.MineOnly,
+            PullMode.MineOnly => PullMode.Off,
+            _ => PullMode.All,
+        };
+        player.SetPullMode(next);
         player.ApplyPullingStatusEffect();
         return next;
+    }
+
+    private static void SetStatusEffect(Player player, StatusEffect effect, bool on)
+    {
+        if (on)
+            player.m_seman.AddStatusEffect(effect);
+        else
+            player.m_seman.RemoveStatusEffect(effect);
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text.RegularExpressions;
 using AzuCraftyBoxes.Compatibility;
 using AzuCraftyBoxes.IContainers;
@@ -18,7 +18,7 @@ namespace AzuCraftyBoxes
     public class AzuCraftyBoxesPlugin : BaseUnityPlugin
     {
         internal const string ModName = "AzuCraftyBoxes";
-        internal const string ModVersion = "1.8.21";
+        internal const string ModVersion = "1.8.27";
         internal const string Author = "Azumatt";
         private const string ModGUID = $"{Author}.{ModName}";
         private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -71,6 +71,10 @@ namespace AzuCraftyBoxes
             DPadDown,
             LeftStick,
             RightStick,
+            ButtonA,
+            ButtonB,
+            ButtonX,
+            ButtonY,
         }
 
         public void Awake()
@@ -85,7 +89,7 @@ namespace AzuCraftyBoxes
             debugLogsEnabled = config("1 - General", "Output Debug Logs", Toggle.Off, "If on, the debug logs will be displayed in the BepInEx console window when BepInEx debugging is enabled.");
             preventPullingLogicMessage = config("1 - General", "Prevent Pulling Message", Toggle.On, "If on, a message will be displayed above the player's head when the prevention pulling logic is toggled using the keybind.", false);
             preventPullingStringFormat = config("1 - General", "Prevent Pulling Format", "<size=30><color=#ffffff>{0}</color></size>\n<size=25>{1}</size>", "String format for the message displayed when the prevention pulling logic is toggled. {0} is replaced by the message, and {1} is replaced by the on/off status. Set to nothing to leave it as default.", false);
-            preventPullingStatusEffectDisplay = config("1 - General", "Prevent Pulling Status", Toggle.On, "If on, the status effect will be displayed when you cannot pull from containers.", false);
+            preventPullingStatusEffectDisplay = config("1 - General", "Prevent Pulling Status", Toggle.On, "If on, a status effect is displayed while you can't pull from containers, or can only pull from your own.", false);
             preventPullingStatusEffectDisplay.SettingChanged += (sender, args) =>
             {
                 if (Player.m_localPlayer != null)
@@ -98,11 +102,14 @@ namespace AzuCraftyBoxes
             unFlashColor = config("2 - CraftyBoxes", "UnFlashColor", Color.white, "Resource amounts will flash from this colour when coming from containers (set both colors to the same color for no flashing)", false);
             canbuildDisplayColor = config("2 - CraftyBoxes", "Can Build Color", Color.green, "The color of the build panel's count of pieces you can build", false);
             cannotbuildDisplayColor = config("2 - CraftyBoxes", "Cannot Build Color", Color.red, "The color of the build panel's count if you cannot build something", false);
-            //pulledMessage = TextEntryConfig("2 - CraftyBoxes", "PulledMessage", "Pulled items to inventory", "Message to show after pulling items to player inventory", false);
-            //pullItemsKey = config("3 - Keys", "PullItemsKey", new KeyboardShortcut(KeyCode.LeftControl), new ConfigDescription("Holding down this key while crafting or building will pull resources into your inventory instead of building. Use https://docs.unity3d.com/Manual/ConventionalGameInput.html", new AcceptableShortcuts()), false);
+            chestToggleEnabled = config("2 - CraftyBoxes", "Container Toggle", Toggle.On, "If on, players can mark individual containers as excluded from crafting. If off, the toggle and its hover text are gone and every container is pulled from again, whatever it was marked as.");
+            chestToggleHoverText = config("2 - CraftyBoxes", "Container Toggle Hover Text", Toggle.On, "If on, the toggle key and the container's crafting status are shown in its hover text.", false);
+            pullItemsKey = config("3 - Keys", "PullItemsKey", new KeyboardShortcut(KeyCode.P, KeyCode.LeftShift), new ConfigDescription("While in build mode, pulls the selected piece's materials from nearby containers into your inventory so you can carry them (portal, cart, etc.) without building and breaking the piece. Use https://docs.unity3d.com/Manual/ConventionalGameInput.html", new AcceptableShortcuts()), false);
+            pullItemsGamepadKey = config("3 - Keys", "PullItemsGamepadKey", GamepadButton.DPadRight, "Controller button, pressed while holding the game's alternate function, to pull the selected piece's materials into your inventory while in build mode. Minimap zoom in and out is suppressed while in build mode. Set to None to disable.", false);
             fillAllModKey = config("3 - Keys", "FillAllModKey", new KeyboardShortcut(KeyCode.LeftShift), new ConfigDescription("Modifier key to pull all available fuel or ore when down. Use https://docs.unity3d.com/Manual/ConventionalGameInput.html", new AcceptableShortcuts()), false);
-            fillAllModGamepadKey = config("3 - Keys", "FillAllModGamepadKey", GamepadButton.AlternateFunction, "Controller modifier to pull all available fuel or ore when held. AlternateFunction uses whatever button you have bound to the game's alternate function (Left Trigger by default). Set to None to disable.", false);
-            preventPullingLogic = config("3 - Keys", "Prevent Pulling Logic", new KeyboardShortcut(KeyCode.O, KeyCode.LeftAlt), new ConfigDescription("Key to prevent pulling from nearby containers. This prevents all pulling logic from running, essentially making the mod appear as if it's not installed. This is different from the Mod Enabled option because it allows toggling on the fly (specifically for you as the player)  Use https://docs.unity3d.com/Manual/ConventionalGameInput.html", new AcceptableShortcuts()), false);
+            fillAllModGamepadKey = config("3 - Keys", "FillAllModGamepadKey", GamepadButton.AlternateFunction, "Controller modifier to pull all available fuel or ore when held. AlternateFunction uses the game's alternate-interact button (same as chest toggle; follows controller layout). Set to None to disable.", false);
+            preventPullingLogic = config("3 - Keys", "Prevent Pulling Logic", new KeyboardShortcut(KeyCode.O, KeyCode.LeftAlt), new ConfigDescription("Key to cycle what you pull from: all containers, only containers you built yourself, or nothing. Nothing prevents all pulling logic from running, essentially making the mod appear as if it's not installed. This is different from the Mod Enabled option because it allows toggling on the fly (specifically for you as the player)  Use https://docs.unity3d.com/Manual/ConventionalGameInput.html", new AcceptableShortcuts()), false);
+            chestToggleKey = config("3 - Keys", "Container Toggle Key", new KeyboardShortcut(KeyCode.E, KeyCode.LeftShift), new ConfigDescription("Key to toggle whether the container you are looking at can be crafted from. Gamepads still use the alt keys + use. Use https://docs.unity3d.com/Manual/ConventionalGameInput.html", new AcceptableShortcuts()), false);
 
             if (!File.Exists(yamlPath))
             {
@@ -163,20 +170,18 @@ namespace AzuCraftyBoxes
             Player? player = Player.m_localPlayer;
             if (player == null) return;
 
-            if (!player.m_customData.TryGetValue(PreventPullingLogicKey, out string value) || !int.TryParse(value, out int result))
-            {
-                // Initialize custom data if not set or invalid value present
-                player.m_customData[PreventPullingLogicKey] = "1";
-                result = 1;
-            }
+            CraftyToggle.CheckToggleKey(player);
+            PullBuildItems.CheckKey(player);
 
             if (preventPullingLogic.Value.IsKeyDown() && player.TakeInput())
             {
-                bool isAllowed = player.TogglePullingAllowed(); // now uses 1=allowed, 0=prevented
-                var onOff = isAllowed
-                    ? "<color=green>Yes</color>"
-                    : "<color=red>No</color>";
-                string message = $"Pull from containers?";
+                string onOff = player.CyclePullMode() switch
+                {
+                    PullMode.All => "<color=green>Yes</color>",
+                    PullMode.MineOnly => "<color=yellow>Only mine</color>",
+                    _ => "<color=red>No</color>",
+                };
+                string message = "Pull from containers?";
                 AzuCraftyBoxesLogger.LogIfReleaseAndDebugEnable(message);
                 if (preventPullingLogicMessage.Value.isOn())
                 {
@@ -189,18 +194,6 @@ namespace AzuCraftyBoxes
                         Localization.instance.Localize(string.Format(preventPullingStringFormat.Value, message, onOff))
                     );
                 }
-
-                if (!isAllowed && preventPullingStatusEffectDisplay.Value.isOn())
-                {
-                    player.m_seman.AddStatusEffect(SE_ContainerPull.SE_ContainerPulling);
-                }
-                else
-                {
-                    player.m_seman.RemoveStatusEffect(SE_ContainerPull.SE_ContainerPulling);
-                }
-
-                result = isAllowed ? 1 : 0;
-                player.m_customData[PreventPullingLogicKey] = result.ToString();
             }
         }
 
@@ -368,6 +361,7 @@ namespace AzuCraftyBoxes
         public static ConfigEntry<string> resourceString = null!;
         public static ConfigEntry<string> pulledMessage = null!;
         public static ConfigEntry<KeyboardShortcut> pullItemsKey = null!;
+        public static ConfigEntry<GamepadButton> pullItemsGamepadKey = null!;
         public static ConfigEntry<KeyboardShortcut> fillAllModKey = null!;
         public static ConfigEntry<GamepadButton> fillAllModGamepadKey = null!;
         public static ConfigEntry<KeyboardShortcut> preventPullingLogic = null!;
@@ -375,6 +369,9 @@ namespace AzuCraftyBoxes
         public static ConfigEntry<string> preventPullingStringFormat = null!;
         public static ConfigEntry<Toggle> preventPullingStatusEffectDisplay = null!;
         public static ConfigEntry<float> mRange = null!;
+        public static ConfigEntry<Toggle> chestToggleEnabled = null!;
+        public static ConfigEntry<Toggle> chestToggleHoverText = null!;
+        public static ConfigEntry<KeyboardShortcut> chestToggleKey = null!;
 
         private ConfigEntry<T> config<T>(string group, string name, T value, ConfigDescription description, bool synchronizedSetting = true)
         {
@@ -461,8 +458,18 @@ namespace AzuCraftyBoxes
 
         public static bool IsButtonHeld(this AzuCraftyBoxesPlugin.GamepadButton button)
         {
+            if (button == AzuCraftyBoxesPlugin.GamepadButton.AlternateFunction && !ZInput.IsGamepadActive()) return false;
+
             string buttonName = button.ZInputName();
             return buttonName.Length > 0 && ZInput.instance != null && ZInput.GetButton(buttonName);
+        }
+
+        public static bool IsButtonDown(this AzuCraftyBoxesPlugin.GamepadButton button)
+        {
+            if (!ZInput.IsGamepadActive()) return false;
+
+            string buttonName = button.ZInputName();
+            return buttonName.Length > 0 && ZInput.instance != null && ZInput.GetButtonDown(buttonName);
         }
 
         public static string DisplayName(this AzuCraftyBoxesPlugin.GamepadButton button)
@@ -493,7 +500,7 @@ namespace AzuCraftyBoxes
             switch (button)
             {
                 case AzuCraftyBoxesPlugin.GamepadButton.AlternateFunction:
-                    return "JoyAltKeys";
+                    return ZInput.IsNonClassicFunctionality() ? "JoyAltKeys" : "JoyAltPlace";
                 case AzuCraftyBoxesPlugin.GamepadButton.LeftTrigger:
                     return "JoyLTrigger";
                 case AzuCraftyBoxesPlugin.GamepadButton.RightTrigger:
@@ -514,6 +521,14 @@ namespace AzuCraftyBoxes
                     return "JoyLStick";
                 case AzuCraftyBoxesPlugin.GamepadButton.RightStick:
                     return "JoyRStick";
+                case AzuCraftyBoxesPlugin.GamepadButton.ButtonA:
+                    return "JoyButtonA";
+                case AzuCraftyBoxesPlugin.GamepadButton.ButtonB:
+                    return "JoyButtonB";
+                case AzuCraftyBoxesPlugin.GamepadButton.ButtonX:
+                    return "JoyButtonX";
+                case AzuCraftyBoxesPlugin.GamepadButton.ButtonY:
+                    return "JoyButtonY";
                 default:
                     return string.Empty;
             }

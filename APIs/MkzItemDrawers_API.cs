@@ -1,4 +1,4 @@
-﻿using Object = UnityEngine.Object;
+using Object = UnityEngine.Object;
 
 namespace AzuCraftyBoxes.APIs;
 
@@ -143,6 +143,12 @@ public static class MkzItemDrawers_API
         MiClear = _drawerType.GetMethod("Clear", BindingFlags.Instance | BindingFlags.NonPublic);
 
         _isInstalled = _fiItem != null && _fiQuantity != null;
+    }
+
+    public static bool IsDrawer(ZNetView nview)
+    {
+        if (!_isInstalled || !nview || _drawerType == null) return false;
+        return nview.gameObject.GetComponentInParent(_drawerType);
     }
 
     private static List<mkzDrawer> FindAllRuntimeDrawers()

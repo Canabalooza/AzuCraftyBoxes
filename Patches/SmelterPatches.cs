@@ -94,18 +94,19 @@ public static class OverrideHoverText
                 break;
             }
 
-            int inInv = GetItemCountInInventoryAndContainers(conversion.m_from.name, conversion.m_from.m_itemData.m_shared.m_name, __instance);
-            int count = Math.Min(free, inInv);
-            free -= count;
             if (!MiscFunctions.CheckItemDropIntegrity(conversion.m_from)) continue;
             conversion.m_from.m_itemData.m_dropPrefab = conversion.m_from.gameObject;
             if (MiscFunctions.GetItemPrefabFromGameObject(conversion.m_from, conversion.m_from.gameObject) == null) continue;
+
+            // Items in the exclude filter never make it into the list, so they can't take up the free slots the other conversions report
+            if (!Boxes.CanItemBePulled(Utils.GetPrefabName(__instance.gameObject), Utils.GetPrefabName(conversion.m_from.m_itemData.m_dropPrefab))) continue;
+
+            int inInv = GetItemCountInInventoryAndContainers(conversion.m_from.name, conversion.m_from.m_itemData.m_shared.m_name, __instance);
+            int count = Math.Min(free, inInv);
             if (count > 0)
             {
-                if (Boxes.CanItemBePulled(Utils.GetPrefabName(__instance.gameObject), Utils.GetPrefabName(conversion.m_from.m_itemData.m_dropPrefab)))
-                {
-                    items.Add($"{count} {conversion.m_from.m_itemData.m_shared.m_name}");
-                }
+                free -= count;
+                items.Add($"{count} {conversion.m_from.m_itemData.m_shared.m_name}");
             }
         }
 
@@ -161,8 +162,16 @@ static class SmelterOnAddOrePatch
     {
         int ore = __instance.GetQueueSize();
         bool pullAll = MiscFunctions.IsFillAllHeld();
-        if (MiscFunctions.ShouldPrevent() || item != null || ore >= __instance.m_maxOre)
+        if (MiscFunctions.ShouldPrevent() || item != null)
             return true;
+
+        // Vanilla checks the player's inventory before the capacity, so it claims there's nothing to process
+        // when the ore is sitting in a nearby container. Report the full smelter here instead.
+        if (ore >= __instance.m_maxOre)
+        {
+            user.Message(MessageHud.MessageType.Center, "$msg_itsfull");
+            return false;
+        }
 
         Inventory inventory = user.GetInventory();
 

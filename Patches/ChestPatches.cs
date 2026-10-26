@@ -55,6 +55,25 @@ static class ContainerLoadPatch
     }
 }
 
+[HarmonyPatch(typeof(Container), nameof(Container.Save))]
+static class ContainerSaveInvalidateCountsPatch
+{
+    static void Postfix() => Boxes.InvalidateCounts();
+}
+
+[HarmonyPatch(typeof(Container), nameof(Container.CheckForChanges))]
+internal static class ContainerClearStuckInUsePatch
+{
+    private static void Postfix(Container __instance)
+    {
+        if (AzuCraftyBoxesPlugin.ModEnabled.Value.isOff() || __instance.IsInUse()) return;
+
+        ZNetView nview = __instance.m_nview;
+        if (nview && nview.IsValid() && nview.IsOwner() && nview.GetZDO().GetInt(ZDOVars.s_inUse, 0) == 1)
+            __instance.UpdateUseVisual();
+    }
+}
+
 [HarmonyPatch(typeof(Container), nameof(Container.OnDestroyed))]
 internal static class ContainerOnDestroyedPatch
 {

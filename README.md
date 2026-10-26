@@ -7,6 +7,8 @@ AzuCraftyBoxes is a Valheim mod that allows players to access and use resources 
 - Automatically use resources from nearby containers within a configurable range when crafting or building
 - Restrict specific items from being pulled out of containers by defining rules in the configuration file in the `BepInEx/config` folder called `Azumatt.AzuCraftyBoxes.yml`
 - Toggle the mod on/off in-game using a configurable hotkey
+- Alt + Use on a chest (or item drawer) to mark it so crafting no longer pulls from that container
+- In build mode, press the pull key (LeftShift + P, or alternate function + D-pad right on a controller) to move the selected piece's materials from nearby containers into your inventory
 - Flashing UI text to indicate when resources are being pulled from nearby containers
 
 
@@ -52,7 +54,7 @@ Prevent Pulling Format [Not Synced with Server]
     * Default Value: <size=30><color=#ffffff>{0}</color></size>\n<size=25>{1}</size>
 
 Prevent Pulling Status [Not Synced with Server]
-* If on, the status effect will be displayed when you cannot pull from containers.
+* If on, a status effect is displayed while you can't pull from containers, or can only pull from your own.
     * Default Value: On
 
 `2 - CraftyBoxes`
@@ -85,6 +87,14 @@ Cannot Build Color [Not Synced with Server]
 * The color of the build panel's count if you cannot build something
     * Default Value: FF0000FF
 
+Container Toggle [Synced with Server]
+* If on, players can mark individual containers as excluded from crafting. If off, the toggle and its hover text are gone and every container is pulled from again, whatever it was marked as.
+    * Default Value: On
+
+Container Toggle Hover Text [Not Synced with Server]
+* If on, the toggle key and the container's crafting status are shown in its hover text.
+    * Default Value: On
+
 `3 - Keys`
 
 FillAllModKey [Not Synced with Server]
@@ -92,12 +102,24 @@ FillAllModKey [Not Synced with Server]
     * Default Value: LeftShift
 
 FillAllModGamepadKey [Not Synced with Server]
-* Controller modifier to pull all available fuel or ore when held. AlternateFunction uses whatever button you have bound to the game's alternate function (Left Trigger by default). Set to None to disable.
+* Controller modifier to pull all available fuel or ore when held. AlternateFunction uses the game's alternate-interact button (same as chest toggle; follows controller layout). Set to None to disable.
     * Default Value: AlternateFunction
 
+PullItemsKey [Not Synced with Server]
+* While in build mode, pulls the selected piece's materials from nearby containers into your inventory so you can carry them (portal, cart, etc.) without building and breaking the piece. Use https://docs.unity3d.com/Manual/ConventionalGameInput.html
+    * Default Value: P + LeftShift
+
+PullItemsGamepadKey [Not Synced with Server]
+* Controller button, pressed while holding the game's alternate function, to pull the selected piece's materials into your inventory while in build mode. Set to None to disable.
+    * Default Value: DPadRight
+
 Prevent Pulling Logic [Not Synced with Server]
-* Key to prevent pulling from nearby containers. This prevents all pulling logic from running, essentially making the mod appear as if it's not installed. This is different from the Mod Enabled option because it allows toggling on the fly (specifically for you as the player)  Use https://docs.unity3d.com/Manual/ConventionalGameInput.html
+* Key to cycle what you pull from: all containers, only containers you built yourself, or nothing. Nothing prevents all pulling logic from running, essentially making the mod appear as if it's not installed. This is different from the Mod Enabled option because it allows toggling on the fly (specifically for you as the player)  Use https://docs.unity3d.com/Manual/ConventionalGameInput.html
     * Default Value: O + LeftAlt
+
+Container Toggle Key [Not Synced with Server]
+* Key to toggle whether the container you are looking at can be crafted from. Gamepads still use the alt keys + use. Use https://docs.unity3d.com/Manual/ConventionalGameInput.html
+    * Default Value: E + LeftShift
 
 </details>
 

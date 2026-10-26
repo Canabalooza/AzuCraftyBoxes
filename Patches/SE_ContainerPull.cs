@@ -14,6 +14,11 @@ static class ObjectDBAwakePatch
             __instance.m_StatusEffects.Add(SE_ContainerPull.SE_ContainerPulling);
         }
 
+        if (!__instance.m_StatusEffects.Contains(SE_ContainerPull.SE_MineOnly))
+        {
+            __instance.m_StatusEffects.Add(SE_ContainerPull.SE_MineOnly);
+        }
+
         __instance.UpdateRegisters();
     }
 }
@@ -50,6 +55,7 @@ public class SE_ContainerPull
 {
     public static readonly int s_statusEffectPreventPulling = "Pull from containers".GetStableHashCode();
     public static StatusEffect SE_ContainerPulling = null!;
+    public static StatusEffect SE_MineOnly = null!;
 
     public static void CreateEffect()
     {
@@ -62,6 +68,16 @@ public class SE_ContainerPull
         SE_ContainerPulling.m_startMessage = "";
         SE_ContainerPulling.m_stopMessageType = MessageHud.MessageType.TopLeft;
         SE_ContainerPulling.m_stopMessage = "";
+
+        SE_MineOnly = ScriptableObject.CreateInstance<StatusEffect>();
+        SE_MineOnly.name = "PullMineOnly";
+        SE_MineOnly.m_name = "Pulling From Own Containers";
+        SE_MineOnly.m_icon = LoadSprite("pullingmineicon.png");
+        SE_MineOnly.m_tooltip = "Only pulls from containers you built yourself (plus backpacks)";
+        SE_MineOnly.m_startMessageType = MessageHud.MessageType.TopLeft;
+        SE_MineOnly.m_startMessage = "";
+        SE_MineOnly.m_stopMessageType = MessageHud.MessageType.TopLeft;
+        SE_MineOnly.m_stopMessage = "";
     }
 
     private static byte[] ReadEmbeddedFileBytes(string name)

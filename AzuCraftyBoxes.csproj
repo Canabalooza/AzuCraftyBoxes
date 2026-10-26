@@ -177,6 +177,7 @@
         <EmbeddedResource Include="Example.yml"/>
         <Content Include="ILRepack.targets"/>
         <EmbeddedResource Include="images\pullingicon.png"/>
+        <EmbeddedResource Include="images\pullingmineicon.png"/>
         <Content Include="Libs\BackpacksAPI.dll">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>

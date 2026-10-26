@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using AzuCraftyBoxes.Compatibility;
 using AzuCraftyBoxes.IContainers;
+using AzuCraftyBoxes.Patches;
 using Backpacks;
 using ItemDataManager;
 using UnityEngine.Pool;
@@ -11,6 +13,30 @@ namespace AzuCraftyBoxes.Util.Functions;
 
 public class Boxes
 {
+    internal struct Tally
+    {
+        public int Sum;
+        public int Having;
+    }
+
+    private readonly struct PullKey : IEquatable<PullKey>
+    {
+        private readonly string _sharedName;
+        private readonly string _itemPrefab;
+
+        public PullKey(string sharedName, string itemPrefab)
+        {
+            _sharedName = sharedName;
+            _itemPrefab = itemPrefab;
+        }
+
+        public bool Equals(PullKey other) => _sharedName == other._sharedName && _itemPrefab == other._itemPrefab;
+
+        public override bool Equals(object? obj) => obj is PullKey other && Equals(other);
+
+        public override int GetHashCode() => (_sharedName.GetHashCode() * 397) ^ _itemPrefab.GetHashCode();
+    }
+
     internal static readonly HashSet<Container> Containers = new();
     private static readonly HashSet<Container> ContainersToAdd = new();
     private static readonly HashSet<Container> ContainersToRemove = new();
@@ -37,6 +63,11 @@ public class Boxes
             if (container)
                 AzuCraftyBoxesPlugin.AzuCraftyBoxesLogger.LogIfReleaseAndDebugEnable($"Removed container {container.name} from list");
         }
+    }
+
+    internal static bool IsInList(Container? container)
+    {
+        return container && Containers.Contains(container);
     }
 
     private static void FlushRegistryIfNeeded()
@@ -89,6 +120,123 @@ public class Boxes
     // The fully built cached list:
     private static readonly List<IContainer> _cachedAll = new(256);
 
+    private static readonly Dictionary<string, Tally> _talliesAny = new(64);
+    private static readonly Dictionary<PullKey, Tally> _talliesPullable = new(64);
+    private static readonly ConditionalWeakTable<Inventory, object> _watched = new();
+    private static readonly object _watchedMarker = new();
+    private static int _vanillaCount;
+    private static int _cachedAllCount;
+    private static int _countsVersion;
+    private static int _memoVersion = -1;
+    private static int _lastDropFrame = -1;
+    private static int _dropStreak;
+    private static string _memoStation = string.Empty;
+    private static object? _memoYaml;
+
+    internal static void InvalidateCounts() => _countsVersion++;
+
+    private static void Watch(Inventory? inventory)
+    {
+        if (inventory == null || _watched.TryGetValue(inventory, out _)) return;
+        _watched.Add(inventory, _watchedMarker);
+        inventory.m_onChanged += InvalidateCounts;
+    }
+
+    private static bool MemoUsable(List<IContainer> containers)
+    {
+        if (containers != _cachedAll || containers.Count != _cachedAllCount)
+            return false;
+
+        int frame = Time.frameCount;
+        if (_memoVersion != _countsVersion || _memoYaml != AzuCraftyBoxesPlugin.yamlData || _memoStation != CacheCurrentCraftingStationPrefabName.CachedStationName)
+        {
+            _talliesAny.Clear();
+            _talliesPullable.Clear();
+            _memoVersion = _countsVersion;
+            _memoYaml = AzuCraftyBoxesPlugin.yamlData;
+            _memoStation = CacheCurrentCraftingStationPrefabName.CachedStationName;
+            if (frame != _lastDropFrame)
+            {
+                _dropStreak = frame - _lastDropFrame == 1 ? _dropStreak + 1 : 0;
+                _lastDropFrame = frame;
+            }
+        }
+
+        if (_dropStreak >= 3)
+            return frame - _lastDropFrame > 1;
+        return true;
+    }
+
+    internal static int TallyAny(List<IContainer> containers, string sharedName, out Tally tally)
+    {
+        tally = default;
+        if (!MemoUsable(containers))
+            return 0;
+        if (_talliesAny.TryGetValue(sharedName, out tally))
+            return _vanillaCount;
+
+        for (int i = 0; i < _vanillaCount; i++)
+        {
+            IContainer container = containers[i];
+            if (container == null) continue;
+            int count = container.ItemCount(sharedName);
+            if (count <= 0) continue;
+            tally.Having++;
+            tally.Sum += count;
+        }
+
+        _talliesAny[sharedName] = tally;
+        return _vanillaCount;
+    }
+
+    internal static int TallyPullable(List<IContainer> containers, string sharedName, string itemPrefabName, out Tally tally)
+    {
+        tally = default;
+        if (!MemoUsable(containers))
+            return 0;
+
+        PullKey key = new(sharedName, itemPrefabName);
+        if (_talliesPullable.TryGetValue(key, out tally))
+            return _vanillaCount;
+
+        string? lastPrefab = null;
+        bool canPull = false;
+        for (int i = 0; i < _vanillaCount; i++)
+        {
+            IContainer container = containers[i];
+            if (container == null) continue;
+            try
+            {
+                string prefabName = container.GetPrefabName();
+                if (prefabName != lastPrefab)
+                {
+                    canPull = CanItemBePulled(prefabName, itemPrefabName);
+                    lastPrefab = prefabName;
+                }
+
+                if (!canPull) continue;
+                int count = container.ItemCount(sharedName);
+                if (count <= 0) continue;
+                tally.Having++;
+                tally.Sum += count;
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+
+        _talliesPullable[key] = tally;
+        return _vanillaCount;
+    }
+
+    internal static int Takeable(Tally tally)
+    {
+        if (!AzuCraftyBoxesPlugin.leaveOne.Value.isOn())
+            return tally.Sum;
+        return tally.Sum - tally.Having;
+    }
+
     internal static List<IContainer> GetNearbyContainers<T>(T src, float rangeMeters) where T : Component
     {
         if (!Player.m_localPlayer || !src) return EmptyIContainers();
@@ -114,11 +262,14 @@ public class Boxes
         _cachedAll.Clear();
 
         // 1) Nearby vanilla containers (no LINQ, squared distance, in-use check)
+        bool mineOnly = CraftyToggle.MineOnly;
+        long playerId = Game.instance.GetPlayerProfile().GetPlayerID();
         float r2 = rangeMeters * rangeMeters;
         foreach (var c in Containers)
         {
-            if (!c) continue;
+            if (!c || !c.IsCraftyContainer() || !CraftyToggle.PullModeAllows(c.m_nview, mineOnly, playerId)) continue;
             if (c.m_wagon != null && c.m_wagon.InUse()) continue;
+            if (OpenedBySomeoneElse(c)) continue;
 
             Vector3 d = c.transform.position - pos;
             if (d.sqrMagnitude > r2) continue;
@@ -126,16 +277,23 @@ public class Boxes
             if (!c.IsInUse() || c.IsInUse() && c.IsOwner())
             {
                 _scratchNearby.Add(VanillaContainer.Create(c));
+                Watch(c.GetInventory());
             }
         }
 
 
         var drawers = APIs.ItemDrawers_API.AllDrawersInRange(pos, rangeMeters);
         foreach (var d in drawers)
-            _scratchkgDrawers.Add(kgDrawer.Create(d));
+        {
+            if (d.m_nview.IsCraftyView() && CraftyToggle.PullModeAllows(d.m_nview, mineOnly, playerId))
+                _scratchkgDrawers.Add(kgDrawer.Create(d));
+        }
         var mkzdrawers = APIs.MkzItemDrawers_API.AllDrawersInRange(pos, rangeMeters);
         foreach (var d in mkzdrawers)
-            _scratchmkzDrawers.Add(mkzDrawer.Create(d));
+        {
+            if (d.m_nview.IsCraftyView() && CraftyToggle.PullModeAllows(d.m_nview, mineOnly, playerId))
+                _scratchmkzDrawers.Add(mkzDrawer.Create(d));
+        }
         
         if (AzuCraftyBoxesPlugin.BackpacksIsLoaded)
         {
@@ -192,6 +350,9 @@ public class Boxes
         _cachedAll.AddRange(_scratchBackpacks);
         _cachedAll.AddRange(_scratchQuivers);
         _cachedAll.AddRange(_scratchGemBags);
+        _vanillaCount = _scratchNearby.Count;
+        _cachedAllCount = _cachedAll.Count;
+        InvalidateCounts();
 
         _lastQueryPos = pos;
         _lastQueryRange = rangeMeters;
@@ -201,6 +362,12 @@ public class Boxes
         AzuCraftyBoxesPlugin.cachedContainerList = _scratchNearby;
 
         return _cachedAll;
+    }
+
+    private static bool OpenedBySomeoneElse(Container c)
+    {
+        ZDO? zdo = c.m_nview ? c.m_nview.GetZDO() : null;
+        return zdo != null && !zdo.IsOwner() && zdo.GetInt(ZDOVars.s_inUse, 0) == 1;
     }
 
     private static readonly List<IContainer> _empty = new(0);
@@ -261,36 +428,19 @@ public class Boxes
 
     private static bool PassesIncludeExcludeChecks(Dictionary<string, List<string>> data, string prefab)
     {
-        // 1. Grab "includeOverride" list
-        List<string> includeOverrideList = data.TryGetValue("includeOverride", out List<string> includeValues) ? includeValues : new List<string>();
-
-        // If the prefab is in 'includeOverride', allow immediately
-        if (includeOverrideList.Contains(prefab))
-        {
+        if (data.TryGetValue("includeOverride", out List<string> includeValues) && includeValues.Contains(prefab))
             return true;
-        }
 
-        // 2. Grab "exclude" list
-        List<string> excludeList = data.TryGetValue("exclude", out List<string> excludeValues) ? excludeValues : new List<string>();
+        if (!data.TryGetValue("exclude", out List<string> excludeList))
+            return true;
 
-        // If the prefab is in 'exclude', disallow
-        // or if part of an excluded group, disallow
         foreach (string? excludedItem in excludeList)
         {
             if (prefab.Equals(excludedItem))
-            {
                 return false;
-            }
 
-            // Check group membership
-            if (GroupUtils.IsGroupDefined(excludedItem))
-            {
-                List<string> groupItems = GroupUtils.GetItemsInGroup(excludedItem);
-                if (groupItems.Contains(prefab))
-                {
-                    return false;
-                }
-            }
+            if (AzuCraftyBoxesPlugin.groups.TryGetValue(excludedItem, out HashSet<string> groupPrefabs) && groupPrefabs.Contains(prefab))
+                return false;
         }
 
         // 3. If we got here, no exclude matched and no includeOverride was needed

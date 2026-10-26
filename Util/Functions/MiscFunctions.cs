@@ -1,4 +1,5 @@
 ﻿using AzuCraftyBoxes.APIs;
+using AzuCraftyBoxes.Util;
 using AzuCraftyBoxes.Compatibility.WardIsLove;
 using AzuCraftyBoxes.IContainers;
 
@@ -13,14 +14,7 @@ public class MiscFunctions
         Player? player = Player.m_localPlayer;
         if (player == null) return true; // Default to allowing pulling if no player is found
 
-        if (!player.m_customData.TryGetValue(AzuCraftyBoxesPlugin.PreventPullingLogicKey, out string value) || !int.TryParse(value, out int result))
-        {
-            // Initialize custom data if not set or invalid value present
-            player.m_customData[AzuCraftyBoxesPlugin.PreventPullingLogicKey] = "1";
-            result = 1;
-        }
-
-        return result == 1;
+        return player.IsPullingAllowed();
     }
 
     internal static bool ShouldPrevent()

@@ -1,9 +1,11 @@
-﻿namespace AzuCraftyBoxes.APIs;
+namespace AzuCraftyBoxes.APIs;
 
 public static class ItemDrawers_API
 {
     private static readonly bool _IsInstalled;
     private static readonly MethodInfo MI_GetAllDrawers;
+    private static readonly HashSet<ZNetView> _knownViews = [];
+    private static float _knownViewsTime;
 
     public class Drawer(ZNetView znv)
     {
@@ -17,6 +19,23 @@ public static class ItemDrawers_API
         public GameObject gameObject => znv.gameObject;
         public string ZNVName => znv.gameObject.name;
         public ZNetView m_nview => znv;
+    }
+
+    public static bool IsDrawer(ZNetView nview)
+    {
+        if (!_IsInstalled || !nview) return false;
+
+        if (Time.time - _knownViewsTime > 2f)
+        {
+            _knownViewsTime = Time.time;
+            _knownViews.Clear();
+            foreach (ZNetView znv in (List<ZNetView>)MI_GetAllDrawers.Invoke(null, null))
+            {
+                _knownViews.Add(znv);
+            }
+        }
+
+        return _knownViews.Contains(nview);
     }
 
     public static List<Drawer> AllDrawers => _IsInstalled

@@ -42,7 +42,8 @@ namespace AzuCraftyBoxes.Patches
 
         internal static void UpdateAddFuelSwitchHoverText(ShieldGenerator __instance, ref string result)
         {
-            double free = __instance.m_maxFuel - __instance.GetFuel();
+            int free = Mathf.Max(0, Mathf.FloorToInt((float)__instance.m_maxFuel - __instance.GetFuel()));
+            int available = 0;
             List<string> items = new();
 
             foreach (ItemDrop fuelItem in __instance.m_fuelItems)
@@ -72,10 +73,12 @@ namespace AzuCraftyBoxes.Patches
                     items.Add($"{inContainers} {sharedName} in nearby containers");
                 }
 
-                if (free - inInv - inContainers > 0 && free < __instance.m_maxFuel)
-                {
-                    items.Add($"{free - inInv - inContainers} needed to fill");
-                }
+                available += inInv + inContainers;
+            }
+
+            if (free - available > 0 && free < __instance.m_maxFuel)
+            {
+                items.Add($"{free - available} needed to fill");
             }
 
             if (items.Count > 0)

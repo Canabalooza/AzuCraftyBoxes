@@ -49,10 +49,12 @@ namespace AzuCraftyBoxes.Util.Functions
             if (_totals.TryGetValue(key, out var v)) return v;
 
             int total = Player.m_localPlayer.GetInventory().CountItems(sharedName);
-            int containersHaving = 0;
+            Boxes.Tally tally;
+            int vanillaEnd = Boxes.TallyAny(_containers, sharedName, out tally);
+            int containersHaving = tally.Having;
+            total += tally.Sum;
 
-            // single pass over containers, zero allocations
-            for (int i = 0; i < _containers.Count; ++i)
+            for (int i = vanillaEnd; i < _containers.Count; ++i)
             {
                 var c = _containers[i];
                 if (c == null) continue;

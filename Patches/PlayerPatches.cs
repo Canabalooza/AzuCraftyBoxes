@@ -85,8 +85,15 @@ static class PlayerHaveRequirementsPatch
 
                     if (dropPrefabValid)
                     {
-                        foreach (IContainer container in nearbyContainers)
+                        Boxes.Tally tally;
+                        int vanillaEnd = Boxes.TallyPullable(nearbyContainers, sharedName, itemPrefabName, out tally);
+                        containersTakeableAtQ = Boxes.Takeable(tally);
+                        for (int i = vanillaEnd; i < nearbyContainers.Count; i++)
                         {
+                            if (invAmountAtQ + containersTakeableAtQ >= requiredAmount)
+                                break;
+
+                            IContainer container = nearbyContainers[i];
                             var containerPrefabName = container.GetPrefabName();
                             if (Boxes.CanItemBePulled(containerPrefabName, itemPrefabName))
                             {
@@ -95,10 +102,6 @@ static class PlayerHaveRequirementsPatch
                                 if (takeable > 0)
                                     containersTakeableAtQ += takeable;
                             }
-
-                            // Stop iterating containers once we have enough at this quality
-                            if (invAmountAtQ + containersTakeableAtQ >= requiredAmount)
-                                break;
                         }
                     }
 
@@ -204,9 +207,15 @@ static class PlayerHaveRequirementsPatchRBoolInt
                         if (resource.m_resItem.m_itemData.m_dropPrefab != null)
                         {
                             string itemPrefabName = resource.m_resItem.name;
+                            Boxes.Tally tally;
+                            int vanillaEnd = Boxes.TallyPullable(nearbyContainers, sharedName, itemPrefabName, out tally);
+                            num += Boxes.Takeable(tally);
 
-                            foreach (IContainer c in nearbyContainers)
+                            for (int i = vanillaEnd; i < nearbyContainers.Count; i++)
                             {
+                                if (num >= amount)
+                                    break;
+                                IContainer c = nearbyContainers[i];
                                 if (c == null) continue;
                                 if (string.IsNullOrWhiteSpace(c.GetPrefabName())) continue;
                                 if (!Boxes.CanItemBePulled(c.GetPrefabName(), itemPrefabName)) continue;
@@ -303,19 +312,17 @@ static class HaveRequirementsPatch2
                         {
                             bool hasItem = false;
                             string sharedName = requirement.m_resItem.m_itemData.m_shared.m_name;
-                            foreach (IContainer c in nearbyContainers)
+                            string itemPrefabName = Utils.GetPrefabName(requirement.m_resItem.m_itemData.m_dropPrefab);
+                            Boxes.Tally tally;
+                            int vanillaEnd = Boxes.TallyPullable(nearbyContainers, sharedName, itemPrefabName, out tally);
+                            hasItem = tally.Having > 0;
+                            for (int i = vanillaEnd; i < nearbyContainers.Count && !hasItem; i++)
                             {
-                                requirement.m_resItem.m_itemData.m_dropPrefab = requirement.m_resItem.gameObject;
-                                if (requirement.m_resItem.m_itemData.m_dropPrefab == null)
-                                    continue;
-                                string itemPrefabName = Utils.GetPrefabName(requirement.m_resItem.m_itemData.m_dropPrefab);
+                                IContainer c = nearbyContainers[i];
                                 bool canItemBePulled = Boxes.CanItemBePulled(c.GetPrefabName(), itemPrefabName);
 
                                 if (canItemBePulled && c.ContainsItem(sharedName, 1, out _))
-                                {
                                     hasItem = true;
-                                    break;
-                                }
                             }
 
                             if (!hasItem)
@@ -325,13 +332,16 @@ static class HaveRequirementsPatch2
                         case Player.RequirementMode.CanBuild when __instance.GetInventory().CountItems(requirement.m_resItem.m_itemData.m_shared.m_name) < requirement.m_amount:
                         {
                             int hasItems = __instance.GetInventory().CountItems(requirement.m_resItem.m_itemData.m_shared.m_name);
-                            foreach (IContainer c in nearbyContainers)
+                            string itemPrefabName = requirement.m_resItem.name;
+                            string sharedName = requirement.m_resItem.m_itemData.m_shared.m_name;
+                            Boxes.Tally tally;
+                            int vanillaEnd = Boxes.TallyPullable(nearbyContainers, sharedName, itemPrefabName, out tally);
+                            hasItems += Boxes.Takeable(tally);
+                            for (int i = vanillaEnd; i < nearbyContainers.Count; i++)
                             {
-                                requirement.m_resItem.m_itemData.m_dropPrefab = requirement.m_resItem.gameObject;
-                                if (requirement.m_resItem.m_itemData.m_dropPrefab == null)
-                                    continue;
-                                string itemPrefabName = requirement.m_resItem.name;
-                                string sharedName = requirement.m_resItem.m_itemData.m_shared.m_name;
+                                if (hasItems >= requirement.m_amount)
+                                    break;
+                                IContainer c = nearbyContainers[i];
                                 bool canItemBePulled = Boxes.CanItemBePulled(c.GetPrefabName(), itemPrefabName);
 
                                 if (canItemBePulled)
@@ -468,6 +478,7 @@ static class ConsumeLaterConsumptionItemsInventoryGuiDoCraftingPatch
     {
         ClearPending();
         Crafting = true;
+        Boxes.InvalidateCounts();
     }
 
     static void Finalizer()

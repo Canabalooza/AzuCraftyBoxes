@@ -4,6 +4,7 @@ namespace AzuCraftyBoxes.IContainers;
 
 public class VanillaContainer(Container _container) : IContainer
 {
+    private string? _prefabName;
     public int ProcessContainerInventory(string reqName, int totalAmount, int totalRequirement)
     {
         Inventory cInventory = _container.GetInventory();
@@ -72,7 +73,7 @@ public class VanillaContainer(Container _container) : IContainer
     }
 
     public Vector3 GetPosition() => _container.transform.position;
-    public string GetPrefabName() => Utils.GetPrefabName(_container.gameObject);
+    public string GetPrefabName() => _prefabName ??= Utils.GetPrefabName(_container.gameObject);
     public Inventory GetInventory() => _container.GetInventory();
 
 
